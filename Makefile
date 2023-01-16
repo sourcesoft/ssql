@@ -5,6 +5,8 @@ GOBUILD=$(GOCMD) build
 GORUN=$(GOCMD) run
 GOMIGRATIONRUN=migration
 
+doc:
+	godoc -http=localhost:6060 & xdg-open http://localhost:6060/pkg/github.com/sourcesoft/ssql/
 check:
 	@echo "-------- ( ͡° ͜ʖ ͡°) --------"
 	@$(GOCHECK) $(shell $(GOTEST_PATH_ALL))

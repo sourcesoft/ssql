@@ -32,49 +32,49 @@ type log struct {
 }
 
 func (log *log) debug(v ...any) {
-	if log.logger == nil || log.level >= 4 {
+	if log.level < 4 {
 		return
 	}
 	(*log.logger).Print(v...)
 }
 
 func (log *log) debugf(format string, v ...any) {
-	if log.logger == nil || log.level >= 4 {
+	if log.level < 4 {
 		return
 	}
 	(*log.logger).Printf(format, v...)
 }
 
 func (log *log) warn(v ...any) {
-	if log.logger == nil || log.level >= 3 {
+	if log.level < 3 {
 		return
 	}
 	(*log.logger).Print(v...)
 }
 
 func (log *log) warnf(format string, v ...any) {
-	if log.logger == nil || log.level >= 3 {
+	if log.level < 3 {
 		return
 	}
 	(*log.logger).Printf(format, v...)
 }
 
 func (log *log) info(v ...any) {
-	if log.logger == nil || log.level >= 2 {
+	if log.level < 2 {
 		return
 	}
 	(*log.logger).Print(v...)
 }
 
 func (log *log) infof(format string, v ...any) {
-	if log.logger == nil || log.level >= 2 {
+	if log.level < 2 {
 		return
 	}
 	(*log.logger).Printf(format, v...)
 }
 
 func (log *log) error(err error, v ...any) {
-	if log.logger == nil || log.level >= 1 {
+	if log.level < 1 {
 		return
 	}
 	v = append(v, fmt.Sprintf("error: %s", err))
@@ -82,7 +82,7 @@ func (log *log) error(err error, v ...any) {
 }
 
 func (log *log) errorf(err error, format string, v ...any) {
-	if log.logger == nil || log.level >= 1 {
+	if log.level < 1 {
 		return
 	}
 	v = append(v, fmt.Sprintf("error: %s", err))

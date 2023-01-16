@@ -35,10 +35,11 @@ func main() {
 	}
 
 	options := ssql.Options{
-		Tag: "sql",
+		Tag:      "sql",
+		LogLevel: ssql.LevelDebug,
 	}
 
-	client, err := ssql.NewClient(ctx, dbCon, options)
+	client, err := ssql.NewClient(ctx, dbCon, &options)
 	if err != nil {
 		log.Error().Err(err).Msg("Error creating postgres client")
 		panic(err)
