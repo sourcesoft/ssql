@@ -19,11 +19,11 @@ type Logger interface {
 type defaultLogger struct{}
 
 func (_ defaultLogger) Print(v ...any) {
-	fmt.Print(v...)
+	fmt.Println(v...)
 }
 
 func (_ defaultLogger) Printf(format string, v ...any) {
-	fmt.Printf(format, v...)
+	fmt.Printf(format+"\n", v...)
 }
 
 type log struct {

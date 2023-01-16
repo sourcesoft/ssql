@@ -1,16 +1,20 @@
-[![Godoc](http://img.shields.io/badge/godoc-reference-blue.svg?style=flat)](https://godoc.org/github.com/sourcesoft/ssql) [![license](http://img.shields.io/badge/license-MIT-red.svg?style=flat)](https://raw.githubusercontent.com/sourcesoft/ssql/master/LICENSE)
+[![Godoc](http://img.shields.io/badge/godoc-reference-blue.svg?style=flat)](https://godoc.org/github.com/sourcesoft/ssql) [![license](http://img.shields.io/badge/license-MIT-red.svg?style=flat)](https://raw.githubusercontent.com/sourcesoft/ssql/main/LICENSE)
 
-This is not an ORM, the client is a tiny simple wrapper around `database/sql`
+# **DO NOT USE - WIP**
+
+This is not an ORM. The client is just a tiny simple wrapper around `database/sql`
 that provides support for simple querying pattern. It supports and provides
 extra utilities that can be used with that makes it actually useful.
 
+If you need anything more than what the API provides, you can use the `Raw` method.
+
 ## Goal
 
-The goal is to have a lightweight wrapper that around `database/sql` that:
-
+- No unnecessary extra abstraction, should be compatible with standard `database/sql`
 - Opt-in for features that make common complex query patterns simple
 - Be opinionated and enforce some usage patterns best practices
-- Some common utilities for common everyday use like `sqlx` scan
+- Minimum use of `reflect`
+- Some common utilities for everyday usage like `sqlx` scan
 while still being compatible with standard `sql` lib
 
 ## Features
@@ -29,8 +33,9 @@ We'll keep it intentionally simple:
 - No JOINS
 - No ORM features
 - No complex WHERE conditions
+- Honesty most non-trival query patterns are not added 
 
-If you think you need more patterns, and it's actually useful that is hard to do
+If you think you need more patterns/utilities/methods/helpers, and it's actually useful that is hard to do
 without a wrapper, feel free to open a PR.
 
 ## Getting Started
