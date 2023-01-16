@@ -8,6 +8,8 @@ require (
 	github.com/sourcesoft/ssql v0.0.0-20230116053855-bde9688fb697
 )
 
+replace github.com/sourcesoft/ssql => ../..
+
 require (
 	github.com/georgysavva/scany/v2 v2.0.0 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect

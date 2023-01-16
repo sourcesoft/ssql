@@ -1,4 +1,4 @@
-module github.com/sourcesoft/ssql/_examples/simple
+module github.com/sourcesoft/ssql/_examples/find
 
 go 1.19
 
@@ -7,6 +7,8 @@ require (
 	github.com/rs/zerolog v1.28.0
 	github.com/sourcesoft/ssql v0.0.0-20230116053855-bde9688fb697
 )
+
+replace github.com/sourcesoft/ssql => ../..
 
 require (
 	github.com/georgysavva/scany/v2 v2.0.0 // indirect

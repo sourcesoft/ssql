@@ -20,8 +20,8 @@ func (c Client) Insert(ctx context.Context, table string, payload interface{}) (
 		valuesArray = append(valuesArray, fmt.Sprintf("$%d", index+1))
 	}
 	indexStr = strings.Join(valuesArray, ", ")
-	stmt, err := c.db.Prepare(fmt.Sprintf("INSERT INTO \"%s\" (%s) VALUES(%s)", table, fieldsStr, indexStr))
-	c.l.debugf(fmt.Sprintf("INSERT INTO \"%s\" (%s) VALUES(%s)", table, fieldsStr, indexStr))
+	stmt, err := c.db.Prepare(fmt.Sprintf("INSERT INTO \"%s\" (%s) VALUES (%s)", table, fieldsStr, indexStr))
+	c.l.debugf(fmt.Sprintf("INSERT INTO \"%s\" (%s) VALUES (%s)", table, fieldsStr, indexStr))
 	if err != nil {
 		c.l.error(err, "Error preparing postgres insert")
 		return nil, err
@@ -29,6 +29,7 @@ func (c Client) Insert(ctx context.Context, table string, payload interface{}) (
 	defer stmt.Close()
 
 	// Execute with values.
+	c.l.debug(pairs.Values...)
 	result, err := stmt.Exec(pairs.Values...)
 	if err != nil {
 		c.l.errorf(err, "Error executing query in postgres")

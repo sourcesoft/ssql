@@ -63,6 +63,7 @@ func main() {
 		log.Error().Err(err).Msg("Postgres create user error")
 		panic(err)
 	}
+	log.Error().Err(err).Msg("insert done")
 
 	// Update row by ID.
 	fEmail = "new@test.com"

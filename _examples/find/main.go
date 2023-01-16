@@ -44,20 +44,57 @@ func main() {
 		panic(err)
 	}
 
-	// Select by row by ID
-	// table name: `user`
-	// column name for id: `id`
-	rows, err := client.SelectByID(ctx, "user", "id", "2d9392f9-c7ab-45e6-8a9e-c883ad4460c9")
+	// Preparing the query options.
+	// Fields to fetch, set to null to fetch all fields (uses '*').
+	dbFields := map[string]bool{
+		"id":         true,
+		"email":      true,
+		"username":   true,
+		"active":     true,
+		"created_at": true,
+	}
+	// Add some custom conditions.
+	conds := []*ssql.ConditionPair{{
+		Field: "active",
+		Value: true,
+		Op:    "=",
+	}}
+	// setting up pagination.
+	shouldReturnTotalCount := true
+	limit := 10
+	params := ssql.Params{
+		OffsetParams: &ssql.OffsetParams{
+			Limit: &limit,
+			// There's also offset available.
+		},
+		// There's also 'order' available.
+		// There's also 'cursor' pagination available.
+	}
+	opts := ssql.SQLQueryOptions{
+		Table:          "user",
+		Fields:         dbFields,
+		WithTotalCount: shouldReturnTotalCount,
+		Params:         &params,
+		Conditions:     conds,
+	}
+
+	// Executing the query.
+	rows, total, err := client.Find(ctx, &opts)
 	if err != nil {
-		log.Error().Err(err).Msg("Cannot select by ID")
+		log.Error().Err(err).Msg("Cannot find users")
 		panic(err)
 	}
-	var resp User
-	if err := ssql.ScanOne(&resp, rows); err != nil {
-		log.Error().Err(err).Msg("Cannot get resp by ID from Postgres")
-		panic(err)
+
+	// Reading through the results.
+	var users []User
+	for rows.Next() {
+		var user User
+		if err := ssql.ScanRow(&user, rows); err != nil {
+			log.Error().Err(err).Msg("Cannot scan users")
+		}
+		users = append(users, user)
 	}
-	log.Debug().Interface("User", resp).Msg("response")
+	log.Debug().Interface("users", users).Msgf("Found users successfully with total of %d", *total)
 }
 
 type User struct {

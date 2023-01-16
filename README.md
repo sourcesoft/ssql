@@ -27,12 +27,12 @@ while still being compatible with standard `sql` lib
 
 **Limitations**
 
-If your DML is not a simple query that is not supported, just use the `Raw` method. 
+If your DML is not a simple query that is not supported, **just use the `Raw` method instead**. 
 We'll keep it intentionally simple:
 
 - No JOINS
 - No ORM features
-- No complex WHERE conditions
+- No transaction support to build complex queries
 - Honesty most non-trival query patterns are not added 
 
 If you think you need more patterns/utilities/methods/helpers, and it's actually useful that is hard to do
@@ -45,6 +45,8 @@ go get "github.com/sourcesoft/ssql"
 ```
 
 [API Reference](https://pkg.go.dev/github.com/sourcesoft/ssql)
+
+[Examples](https://github.com/sourcesoft/ssql/tree/main/_examples)
 
 ## Simple usage
 

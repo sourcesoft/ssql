@@ -69,6 +69,11 @@ install-migration:
 	cd scripts/migration && go install
 
 example-simple:
-	cd _examples/simple && \
+	@cd _examples/simple && \
+	SSQL_DB=ssql SSQL_USERNAME=postgres SSQL_PASSWORD=dev SSQL_HOST=localhost SSQL_PORT=5432 \
+    go run *.go
+
+example-find:
+	@cd _examples/find && \
 	SSQL_DB=ssql SSQL_USERNAME=postgres SSQL_PASSWORD=dev SSQL_HOST=localhost SSQL_PORT=5432 \
     go run *.go
