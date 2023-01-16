@@ -1,3 +1,5 @@
+[![Godoc](http://img.shields.io/badge/godoc-reference-blue.svg?style=flat)](https://godoc.org/github.com/sourcesoft/ssql) [![license](http://img.shields.io/badge/license-MIT-red.svg?style=flat)](https://raw.githubusercontent.com/sourcesoft/ssql/master/LICENSE)
+
 This is not an ORM, the client is a tiny simple wrapper around `database/sql`
 that provides support for simple querying pattern. It supports and provides
 extra utilities that can be used with that makes it actually useful.
@@ -36,6 +38,8 @@ without a wrapper, feel free to open a PR.
 ```
 go get "github.com/sourcesoft/ssql"
 ```
+
+[API Reference](https://pkg.go.dev/github.com/sourcesoft/ssql)
 
 ## Simple usage
 
