@@ -69,3 +69,7 @@ func CursorToInt(cursor string) int {
 	}
 	return c
 }
+
+func StrToCursor(cursor string) string {
+	return base64Encode(fmt.Sprintf("cursor:%s", cursor))
+}

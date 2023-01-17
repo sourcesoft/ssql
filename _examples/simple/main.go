@@ -36,7 +36,7 @@ func main() {
 
 	options := ssql.Options{
 		Tag:      "sql",
-		LogLevel: ssql.LevelDebug,
+		LogLevel: 4,
 	}
 
 	client, err := ssql.NewClient(ctx, dbCon, &options)
