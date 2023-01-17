@@ -40,7 +40,7 @@ without a wrapper, feel free to open a PR.
 
 ## Getting Started
 
-```
+```bash
 go get "github.com/sourcesoft/ssql"
 ```
 
@@ -52,7 +52,7 @@ go get "github.com/sourcesoft/ssql"
 
 First connect to the database.
 
-```
+```golang
 package main
 
 import (
@@ -86,7 +86,7 @@ func main() {
 
 Inserting is easy:
 
-```
+```golang
   type User struct {
     ID            *string `json:"id,omitempty" sql:"id" graph:"id" rel:"pk"`
     Username      *string `json:"username,omitempty" sql:"username" graph:"username"`
@@ -121,7 +121,7 @@ Inserting is easy:
 
 We can then SELECT the row by ID:
 
-```
+```golang
 rows, err := client.SelectByID(ctx, "user", "id", "7f8d1637-ca82-4b1b-91dc-0828c98ebb34")
 if err != nil {
 	panic(err)
