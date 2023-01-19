@@ -16,7 +16,7 @@ func sqlParamsToConditionPairs(arg *Params) []*ConditionPair {
 	return cursorPairs
 }
 
-func getSQLWhereClauseFromConditions(conditions []*ConditionPair) (whereStm string, args []interface{}) {
+func getSQLWhereClauseFromConditions(conditions []*ConditionPair, startIndex int) (whereStm string, args []interface{}) {
 	if len(conditions) > 0 {
 		// Prepare statement.
 		pairs := []string{}
@@ -28,13 +28,13 @@ func getSQLWhereClauseFromConditions(conditions []*ConditionPair) (whereStm stri
 				iter := ""
 				for i := 0; i < rv.Len(); i++ {
 					vals = append(vals, rv.Index(i).Interface())
-					iter = fmt.Sprintf("%s, $%d", iter, i+1)
+					iter = fmt.Sprintf("%s, $%d", iter, startIndex+i+1)
 				}
 				iter = strings.TrimPrefix(iter, ", ")
 				pairs = append(pairs, fmt.Sprintf("%s %s (%s)", value.Field, value.Op, iter))
 				args = append(args, vals...)
 			} else {
-				pairs = append(pairs, fmt.Sprintf("%s %s $%d", value.Field, value.Op, index+1))
+				pairs = append(pairs, fmt.Sprintf("%s %s $%d", value.Field, value.Op, startIndex+index+1))
 				args = append(args, value.Value)
 			}
 		}

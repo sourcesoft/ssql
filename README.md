@@ -2,22 +2,28 @@
 
 **This library is still in development and the API may change**
 
-- [What it is and what it's not](#what-it-is-and-what-it-s-not)
+### Table of Contents
+
+- [What it is and what it's not](#what-it-is-and-what-its-not)
   * [Goal](#goal)
   * [Features](#features)
   * [Limitations](#limitations)
 - [Getting Started](#getting-started)
-  * [Installation](#installation)
-  * [Creating the client](#creating-the-client)
-  * [Insert records](#insert-records)
-  * [Select By ID](#select-by-id)
-  * [Update By ID](#update-by-id)
-  * [Delete By ID](#delete-by-id)
-  * [Find records with conditions and pagination](#find-records-with-conditions-and-pagination)
-  * [Cursor pagination](#cursor-pagination)
-  * [Sorting](#sorting)
-  * [Conditions](#conditions)
-  * [GraphQL](#graphql)
+- [APIs](#apis)
+  * [Insert](#insert)
+  * [UpdateOne](#updateone)
+  * [Update](#update)
+  * [DeleteOne](#deleteone)
+  * [Delete](#delete)
+  * [FindOne](#findone)
+  * [Find](#find)
+    + [Find: Minimal](#find-minimal)
+    + [Find: Offset Pagination](#find-offset-pagination)
+    + [Find: Cursor Pagination](#find-cursor-pagination)
+    + [Find: Sorting](#find-sorting)
+    + [Find: Conditions](#find-conditions)
+    + [Find: GraphQL](#find-graphql)
+  * [Raw](#raw)
   * [Helpers working with structs](#helpers-working-with-structs)
   * [Helpers scanning query results](#helpers-scanning-query-results)
 
@@ -63,9 +69,11 @@ We'll keep it intentionally simple:
 If you think you need more patterns/utilities/methods/helpers, and it's actually useful that is hard to do
 without a wrapper, feel free to open a PR.
 
+[↩](#table-of-contents)
+
 ## Getting Started
 
-### Installation:
+Get the library with:
 
 ```bash
 go get "github.com/sourcesoft/ssql"
@@ -75,9 +83,7 @@ go get "github.com/sourcesoft/ssql"
 
 [Examples](https://github.com/sourcesoft/ssql/tree/main/_examples)
 
-### Creating the client
-
-First connect to the database.
+First create the client by connecting to a database of your choice.
 
 ```golang
 package main
@@ -111,7 +117,13 @@ func main() {
   ...
 ```
 
-### Insert records
+See queries like [FindOne](#findone) or other APIs to see how to use the client to execute queries.
+
+[↩](#table-of-contents)
+
+## APIs
+
+### Insert
 
 When using insert, you will be passing the variable of a struct, which `ssql` uses `reflect` package to
 extract the `sql` tag by default (you can customize it in the client options).
@@ -149,13 +161,94 @@ if err != nil {
 
 ```
 
-### Select By ID
+[↩](#table-of-contents)
+
+### UpdateOne
+
+Having the ID of the record you can simply update it by passing the struct variable.
+
+```golang
+// Update row by ID.
+fEmail = "new@test.com"
+newUser.Email = &fEmail
+res, err := client.UpdateOne(ctx, "user", "id", fID, newUser)
+if err != nil {
+  log.Error().Err(err).Msg("Postgres update user error")
+  panic(err)
+}
+if count, err := (*res).RowsAffected(); count < 1 {
+  log.Error().Err(err).Msg("Postgres update user error, or not found")
+  panic(err)
+}
+```
+
+[↩](#table-of-contents)
+
+### Update
+
+You can also create a condition array to update all the matching fields.
+
+```golang
+...
+// Add some custom conditions.
+conds := []*ssql.ConditionPair{{
+  Field: "active",
+  Value: true,
+  Op:    "=",
+}}
+fFalse = false
+newUser.Active = &fFalse
+res, err := client.Update(ctx, "user", conds, updatedUser)
+...
+```
+
+[↩](#table-of-contents)
+
+### DeleteOne
+
+```golang
+res, err = client.DeleteOne(ctx, "user", "id", fID)
+if err != nil {
+  log.Error().Err(err).Msg("Cannot delete user by ID from Postgres")
+  panic(err)
+}
+if count, err := (*res).RowsAffected(); count < 1 {
+  log.Error().Err(err).Msg("User not found")
+  panic(err)
+}
+```
+
+[↩](#table-of-contents)
+
+### Delete
+
+You can also create a condition array to delete all the matching fields.
+
+```golang
+...
+// Add some custom conditions.
+conds := []*ssql.ConditionPair{{
+  Field: "active",
+  Value: false,
+  Op:    "=",
+}}
+res, err = client.Delete(ctx, "user", conds)
+if err != nil {
+  log.Error().Err(err).Msg("Cannot delete user")
+  panic(err)
+}
+...
+```
+
+[↩](#table-of-contents)
+
+### FindOne
 
 Having a primary key and finding your record using that is a common use case.
 You can also pass the key (`id` in the following example) to look up.
 
 ```golang
-rows, err := client.SelectByID(ctx, "user", "id", "7f8d1637-ca82-4b1b-91dc-0828c98ebb34")
+rows, err := client.FindOne(ctx, "user", "id", "7f8d1637-ca82-4b1b-91dc-0828c98ebb34")
 if err != nil {
 	panic(err)
 }
@@ -169,60 +262,19 @@ logger.Print("user %+v", resp)
 
 Check the [examples](https://github.com/sourcesoft/ssql/tree/main/_examples) folder to see more.
 
-### Update By ID
 
-Having the ID of the record you can simply update it by passing the struct variable.
+[↩](#table-of-contents)
 
-```golang
-// Update row by ID.
-fEmail = "new@test.com"
-newUser.Email = &fEmail
-res, err := client.UpdateByID(ctx, "user", "id", fID, newUser)
-if err != nil {
-  log.Error().Err(err).Msg("Postgres update user error")
-  panic(err)
-}
-if count, err := (*res).RowsAffected(); count < 1 {
-  log.Error().Err(err).Msg("Postgres update user error, or not found")
-  panic(err)
-}
-```
+### Find
 
-### Delete By ID
+#### Find: Minimal
 
-```golang
-res, err = client.DeleteByID(ctx, "user", "id", fID)
-if err != nil {
-  log.Error().Err(err).Msg("Cannot delete user by ID from Postgres")
-  panic(err)
-}
-if count, err := (*res).RowsAffected(); count < 1 {
-  log.Error().Err(err).Msg("User not found")
-  panic(err)
-}
-```
-
-### Find records with conditions and pagination
+Let's see how a minimal simple `Find` query looks like.
 
 First build the query options
 
 ```golang
-// Fields to fetch, set to null to fetch all fields (uses '*').
-dbFields := map[string]bool{
-  "id":         true,
-  "email":      true,
-  "username":   true,
-  "active":     true,
-  "created_at": true,
-}
-// Add some custom conditions.
-conds := []*ssql.ConditionPair{{
-  Field: "active",
-  Value: true,
-  Op:    "=",
-}}
 // setting up pagination.
-shouldReturnTotalCount := true
 limit := 10
 params := ssql.Params{
   OffsetParams: &ssql.OffsetParams{
@@ -234,10 +286,8 @@ params := ssql.Params{
 }
 opts := ssql.SQLQueryOptions{
   Table:          "user",
-  Fields:         dbFields,
   WithTotalCount: shouldReturnTotalCount,
   Params:         &params,
-  Conditions:     conds,
 }
 ```
 
@@ -266,7 +316,32 @@ for rows.Next() {
 }
 ```
 
-### Cursor pagination
+[↩](#table-of-contents)
+
+#### Find: Offset Pagination
+
+You can use offset and limit pagination.
+
+```golang
+limit := 10
+offset := 3
+params := ssql.Params{
+  OffsetParams: &ssql.OffsetParams{
+    Limit: &limit,
+    Offset: &offset
+  },
+}
+// Same as before use the params in query options argument.
+opts := ssql.SQLQueryOptions{
+  Table:          "user",
+  Params:         &params,
+}
+rows, total, err := client.Find(ctx, &opts)
+```
+
+[↩](#table-of-contents)
+
+#### Find: Cursor Pagination
 
 ```golang
 params := ssql.Params{
@@ -288,7 +363,9 @@ opts := ssql.SQLQueryOptions{
 rows, total, err := client.Find(ctx, &opts)
 ```
 
-### Sorting
+[↩](#table-of-contents)
+
+#### Find: Sorting
 
 You can have one or many sorting configs. The order matters.
 
@@ -311,7 +388,9 @@ rows, total, err := client.Find(ctx, &opts)
   
 ```
 
-### Conditions
+[↩](#table-of-contents)
+
+#### Find: Conditions
 
 You can set one or many conditions which will translate to WHERE clause in the final query.
 
@@ -343,7 +422,9 @@ rows, total, err := client.Find(ctx, &opts)
 
 ```
 
-### GraphQL
+[↩](#table-of-contents)
+
+#### Find: GraphQL
 
 You can get a full PageInfo GraphQL Relay type which is:
 
@@ -390,6 +471,27 @@ if total != nil {
   pageInfo.TotalCount = total
 }
 ```
+
+[↩](#table-of-contents)
+
+### Raw
+
+If the provided API doesn't satisfy the usage you need, feel free to just run a raw custom query.
+
+```golang
+...
+// Add some custom conditions.
+values := []interface{}{true}
+raw := "SELECT * FROM \"user\" WHERE active = $1"
+res, err = client.Raw(ctx, raw, values)
+if err != nil {
+  log.Error().Err(err).Msg("Cannot execute raw query")
+  panic(err)
+}
+...
+```
+
+[↩](#table-of-contents)
 
 ### Helpers working with structs
 
@@ -490,6 +592,7 @@ func MyInsertRowFunction(user *User) {
 }
 ```
 
+[↩](#table-of-contents)
 
 ### Helpers scanning query results
 
@@ -497,7 +600,7 @@ Use `ScanOne` if you are selecting/expecting one result. You can pass your struc
 without mapping individual fields like the standard `database/sql` library forces you to.
 
 ```golang
-rows, err := client.SelectByID(ctx, "user", "id", "7f8d1637-ca82-4b1b-91dc-0828c98ebb34")
+rows, err := client.FindOne(ctx, "user", "id", "7f8d1637-ca82-4b1b-91dc-0828c98ebb34")
 if err != nil {
   log.Error().Err(err).Msg("Cannot select by ID")
   panic(err)
@@ -527,3 +630,5 @@ for rows.Next() {
   users = append(users, user)
 }
 ```
+
+[↩](#table-of-contents)

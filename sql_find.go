@@ -7,6 +7,12 @@ import (
 	"strings"
 )
 
+func (c Client) FindOne(ctx context.Context, table string, idKey, idValue string) (*sql.Rows, error) {
+	c.l.debugf(fmt.Sprintf("SELECT * FROM \"%s\" WHERE %s=$1", table, idKey))
+	rows, err := c.db.Query(fmt.Sprintf("SELECT * FROM \"%s\" WHERE %s=$1", table, idKey), idValue)
+	return rows, err
+}
+
 func (c Client) Find(ctx context.Context, options *SQLQueryOptions) (*sql.Rows, *int, error) {
 	// Calculate totalCount.
 	var totalCount int
@@ -14,7 +20,7 @@ func (c Client) Find(ctx context.Context, options *SQLQueryOptions) (*sql.Rows, 
 		// Or use: SELECT reltuples AS estimate FROM pg_class where relname = 'user';
 		// But note that the above query requires: ANALYZE VERBOSE "tablename".
 		qTotalCount := fmt.Sprintf("SELECT COUNT(*) FROM \"%s\"", options.Table)
-		whereStmPure, argsPure := getSQLWhereClauseFromConditions(options.Conditions)
+		whereStmPure, argsPure := getSQLWhereClauseFromConditions(options.Conditions, 0)
 		if whereStmPure != "" {
 			qTotalCount = fmt.Sprintf("%s WHERE %s", qTotalCount, whereStmPure)
 		}
@@ -35,7 +41,7 @@ func (c Client) Find(ctx context.Context, options *SQLQueryOptions) (*sql.Rows, 
 		order, pagination = getSQLStmFromPaginationAndSortParams(options.Params)
 		cursorConditions = sqlParamsToConditionPairs(options.Params)
 	}
-	whereStm, args := getSQLWhereClauseFromConditions(append(options.Conditions, cursorConditions...))
+	whereStm, args := getSQLWhereClauseFromConditions(append(options.Conditions, cursorConditions...), 0)
 
 	// Build query statement.
 	fieldsSeparated := "*"
