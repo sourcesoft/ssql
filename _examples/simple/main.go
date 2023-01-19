@@ -69,7 +69,7 @@ func main() {
 	// Update row by ID.
 	fEmail = "new@test.com"
 	newUser.Email = &fEmail
-	res, err := client.UpdateByID(ctx, "user", "id", fID, newUser)
+	res, err := client.UpdateOne(ctx, "user", "id", fID, newUser)
 	if err != nil {
 		log.Error().Err(err).Msg("Postgres update user error")
 		panic(err)
@@ -82,7 +82,7 @@ func main() {
 	// Select by row by ID.
 	// Table name: `user`
 	// Column name for id: `id`
-	rows, err := client.SelectByID(ctx, "user", "id", "7f8d1637-ca82-4b1b-91dc-0828c98ebb34")
+	rows, err := client.FindOne(ctx, "user", "id", "7f8d1637-ca82-4b1b-91dc-0828c98ebb34")
 	if err != nil {
 		log.Error().Err(err).Msg("Cannot select by ID")
 		panic(err)
@@ -95,7 +95,7 @@ func main() {
 	log.Debug().Interface("User", resp).Msg("response")
 
 	// Delete row by ID.
-	res, err = client.DeleteByID(ctx, "user", "id", fID)
+	res, err = client.DeleteOne(ctx, "user", "id", fID)
 	if err != nil {
 		log.Error().Err(err).Msg("Cannot delete user by ID from Postgres")
 		panic(err)
