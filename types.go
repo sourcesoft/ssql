@@ -7,11 +7,14 @@ type ConditionPair struct {
 }
 
 type SQLQueryOptions struct {
-	Table          string
-	Fields         map[string]bool // omit to query all fields.
-	WithTotalCount bool
-	Params         *Params
-	Conditions     []*ConditionPair
+	Table             string
+	Tag               string // Override client tag config explicitly per query.
+	MainSortField     string
+	MainSortDirection string
+	Fields            map[string]bool // omit to query all fields.
+	WithTotalCount    bool
+	Params            *Params
+	Conditions        []*ConditionPair
 }
 
 type Params struct {

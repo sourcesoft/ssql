@@ -18,5 +18,4 @@ func (param OffsetParams) GetSQLStatement() string {
 type OffsetParams struct {
 	Limit  *int `json:"limit,omitempty"`
 	Offset *int `json:"offset,omitempty"`
-	Used   bool `json:"-"`
 }

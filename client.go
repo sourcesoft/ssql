@@ -14,13 +14,19 @@ type Options struct {
 	LogLevel int
 	// If not set, the default logger will be used
 	Logger *Logger
+	// Main default pagination sort config. It can be overriden
+	// by Find query options.
+	MainSortField     string
+	MainSortDirection string
 }
 
 // Client provides common methods for using SQL.
 type Client struct {
-	db  *sql.DB
-	tag string
-	l   *log
+	db                *sql.DB
+	tag               string
+	mainSortField     string
+	mainSortDirection string
+	l                 *log
 }
 
 // NewClient creates a new SQL client using the database connection and give options.
@@ -41,10 +47,35 @@ func NewClient(ctx context.Context, db *sql.DB, options *Options) (*Client, erro
 	}
 
 	ret := Client{
-		db:  db,
-		tag: tag,
-		l:   &log{logger: &logger, level: logLevel},
+		db:                db,
+		tag:               tag,
+		mainSortField:     options.MainSortField,
+		mainSortDirection: options.MainSortDirection,
+		l: &log{
+			logger: &logger,
+			level:  logLevel,
+		},
 	}
 	ret.l.info("SQL client created successfully")
 	return &ret, nil
 }
+
+const (
+	// Used by query options and the API.
+	DirectionDesc    = "DESC"
+	DirectionAsc     = "ASC"
+	OPEqual          = ">"
+	OPNotEqual       = "<>"
+	OPGreater        = ">"
+	OPLess           = "<"
+	OPGreatorOrEqual = ">="
+	OPLessOrEqual    = "<="
+	OPLogicalIn      = "IN"
+	// Only used internally.
+	opLogicalAnd = "AND"
+	// OPLogicalOr      = "OR"
+	// OPLogicalNot     = "NOT"
+	// OPLogicalLike    = "LIKE"
+	// OPLogicalExists  = "EXISTS"
+	// OPLogicalBetween = "BETWEEN"
+)

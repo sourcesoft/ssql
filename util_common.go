@@ -21,8 +21,8 @@ func base64Decode(input string) (string, error) {
 }
 
 func reverse[T any](args *[]T) *[]T {
-	output := lo.Reverse(*args)
-	return &output
+	*args = lo.Reverse(*args)
+	return args
 }
 
 func popArray[T any](slice *[]T) *[]T {
@@ -32,17 +32,28 @@ func popArray[T any](slice *[]T) *[]T {
 	if len(*slice) < 1 {
 		return slice
 	}
-	arr := append((*slice)[:len(*slice)-1], (*slice)[len(*slice):]...)
-	return &arr
+	*slice = append((*slice)[:len(*slice)-1], (*slice)[len(*slice):]...)
+	return slice
+}
+
+var mappingCache = map[interface{}][]TagMappings{}
+
+func getMappingCacheKey(t *reflect.Type, tags *[]string) string {
+	return (*t).PkgPath() + ":" + strings.Join(*tags, ",")
 }
 
 func ExtractStructMappings(tags []string, s interface{}) (TagMappings, TagMappings) {
-	t := reflect.TypeOf(s)
+	t, _ := getStructType(s)
+	cacheKey := getMappingCacheKey(t, &tags)
+	if mappingCache[cacheKey] != nil && len(mappingCache[cacheKey]) > 1 {
+		return mappingCache[cacheKey][0], mappingCache[cacheKey][1]
+	}
+
 	mappingsByFields := TagMappings{}
 	mappingsByTags := TagMappings{}
 	tags = append(tags, "relation")
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
+	for i := 0; i < (*t).NumField(); i++ {
+		field := (*t).Field(i)
 		for _, tag := range tags {
 			col := field.Tag.Get(tag)
 			if mappingsByFields[tag] == nil {
@@ -57,6 +68,7 @@ func ExtractStructMappings(tags []string, s interface{}) (TagMappings, TagMappin
 			}
 		}
 	}
+	mappingCache[cacheKey] = []TagMappings{mappingsByTags, mappingsByFields}
 	return mappingsByTags, mappingsByFields
 }
 
@@ -67,4 +79,12 @@ func (mappings TagMappings) GetTag(tag, field string) string {
 		return ""
 	}
 	return mappings[tag][field]
+}
+
+func getStructType(s interface{}) (*reflect.Type, string) {
+	if t := reflect.TypeOf(s); t.Kind() == reflect.Ptr {
+		return &t, "*" + t.Elem().Name()
+	} else {
+		return &t, t.Name()
+	}
 }

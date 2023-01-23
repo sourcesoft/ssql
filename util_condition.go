@@ -6,12 +6,14 @@ import (
 	"strings"
 )
 
-func sqlParamsToConditionPairs(arg *Params) []*ConditionPair {
+func sqlParamsToConditionPairs(arg *SQLQueryOptions) []*ConditionPair {
 	cursorPairs := []*ConditionPair{}
 	// Cursors also may enforce conditions.
-	if arg.CursorParams != nil && arg.CursorParams.getSQLFieldValuePairs() != nil {
-		pair := arg.CursorParams.getSQLFieldValuePairs()
-		cursorPairs = append(cursorPairs, pair)
+	if arg.Params.CursorParams != nil {
+		pair := arg.Params.CursorParams.getSQLFieldValuePairs(arg)
+		if pair != nil {
+			cursorPairs = append(cursorPairs, pair)
+		}
 	}
 	return cursorPairs
 }
@@ -21,7 +23,7 @@ func getSQLWhereClauseFromConditions(conditions []*ConditionPair, startIndex int
 		// Prepare statement.
 		pairs := []string{}
 		for index, value := range conditions {
-			if strings.ToLower(value.Op) == "in" && reflect.TypeOf(value.Value).Kind() == reflect.Slice {
+			if strings.ToUpper(value.Op) == OPLogicalIn && reflect.TypeOf(value.Value).Kind() == reflect.Slice {
 				// Trying to print "fieldName IN ($1, $2, $3)"
 				vals := []interface{}{}
 				rv := reflect.ValueOf(value.Value)
@@ -38,7 +40,7 @@ func getSQLWhereClauseFromConditions(conditions []*ConditionPair, startIndex int
 				args = append(args, value.Value)
 			}
 		}
-		whereStm = strings.Join(pairs, " AND ")
+		whereStm = strings.Join(pairs, fmt.Sprintf(" %s ", opLogicalAnd))
 	}
 	return whereStm, args
 }

@@ -34,41 +34,53 @@ func getPairsByTag(tagName string, s interface{}) FieldValuePairs {
 // Note:
 // - For previous steps check function 'GetSQLFieldValuePairs'.
 // - For next steps 5-10 check function 'PrepareGraphQLConnection'.
-func mutateParamsByCursor(arg *Params) *Params {
-	if arg == nil {
+func mutateParamsByCursor(arg *SQLQueryOptions) *Params {
+	if arg == nil || arg.Params == nil {
 		return nil
 	}
-	if arg.CursorParams != nil && arg.CursorParams.Used {
-		field := cursorField
-		// Note: offset/limit pagination is out of question when cursor is used.
-		// For cursor pagination sometimes we need limit in addition to ordering.
-		dir := "DESC"
-		limit := 0
-		if arg.CursorParams.First != nil && *arg.CursorParams.First != 0 {
-			limit = (*arg.CursorParams.First) + 1
-		} else if arg.CursorParams.Last != nil && *arg.CursorParams.Last != 0 {
-			dir = "ASC"
-			limit = (*arg.CursorParams.Last) + 1
+	limit := 10 // Default
+	dir := arg.MainSortDirection
+	if arg.Params.CursorParams != nil && arg.Params.CursorParams.First != nil {
+		limit = *arg.Params.CursorParams.First + 1
+	} else if arg.Params.CursorParams != nil && arg.Params.CursorParams.Last != nil {
+		if dir == DirectionAsc {
+			dir = DirectionDesc
+		} else {
+			dir = DirectionAsc
 		}
-		arg.SortParams = append(arg.SortParams, &SortParams{
-			Direction: &dir,
-			Field:     &field,
-		})
-		arg.OffsetParams = &OffsetParams{
+		limit = *arg.Params.CursorParams.Last + 1
+	}
+
+	if (arg.Params.OffsetParams == nil || arg.Params.OffsetParams.Limit == nil) && arg.Params.CursorParams != nil && arg.MainSortField != "" {
+		arg.Params.OffsetParams = &OffsetParams{
 			Limit: &limit,
 		}
+	} else if arg.Params.OffsetParams != nil {
+		if arg.Params.OffsetParams.Limit == nil {
+			arg.Params.OffsetParams.Limit = &limit
+		} else {
+			limit = *arg.Params.OffsetParams.Limit
+			limit++
+			arg.Params.OffsetParams.Limit = &limit
+		}
 	}
-	return arg
+
+	field := arg.MainSortField
+	arg.Params.SortParams = append(arg.Params.SortParams, &SortParams{
+		Direction: &dir,
+		Field:     &field,
+	})
+	return arg.Params
 }
 
-func getSQLStmFromPaginationAndSortParams(arg *Params) (paramsOrder, paramsPagination string) {
-	if arg == nil {
+func getSQLStmFromPaginationAndSortParams(arg *SQLQueryOptions) (paramsOrder, paramsPagination string) {
+	if arg == nil || arg.Params == nil {
 		return "", ""
 	}
 	// ORDER BY.
-	for sIndex, sParam := range arg.SortParams {
+	for sIndex, sParam := range arg.Params.SortParams {
 		split := ""
-		if sIndex > 0 && sIndex < len(arg.SortParams) {
+		if sIndex > 0 && sIndex < len(arg.Params.SortParams) {
 			split = ", "
 		}
 		if sParam != nil && sParam.getSQLStatement() != "" {
@@ -79,11 +91,11 @@ func getSQLStmFromPaginationAndSortParams(arg *Params) (paramsOrder, paramsPagin
 		paramsOrder = fmt.Sprintf("ORDER BY %s", paramsOrder)
 	}
 	// LIMIT/OFFSET Pagination.
-	if arg.OffsetParams != nil && arg.OffsetParams.GetSQLStatement() != "" {
+	if arg.Params.OffsetParams != nil && arg.Params.OffsetParams.GetSQLStatement() != "" {
 		if paramsPagination != "" {
 			paramsPagination = fmt.Sprintf("%s ", paramsPagination)
 		}
-		paramsPagination = fmt.Sprintf("%s%s", paramsPagination, arg.OffsetParams.GetSQLStatement())
+		paramsPagination = fmt.Sprintf("%s%s", paramsPagination, arg.Params.OffsetParams.GetSQLStatement())
 	}
 	return paramsOrder, paramsPagination
 }

@@ -2,35 +2,44 @@ package ssql
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 )
 
 // GetSQLFieldValuePairs uses cursor params to get 'conditions' using the following rules:
-// 1. If the after argument is provided => add id > parsed_cursor to the WHERE clause.
-// 2. If the before argument is provided => add id < parsed_cursor to the WHERE clause.
+// 1. If the after argument is provided => add cursor-field > after to the WHERE clause.
+// 2. If the before argument is provided => add cursor-field < before to the WHERE clause.
 //
 // Note:
 // - For next steps 3 and 4 check function 'MutateParamsByCursor'.
 // - For next steps 5-10 check function 'PrepareGraphQLConnection'.
-func (param CursorParams) getSQLFieldValuePairs() *ConditionPair {
-	if param.After == nil && param.Before == nil {
+func (param CursorParams) getSQLFieldValuePairs(arg *SQLQueryOptions) *ConditionPair {
+	if (param.After == nil && param.Before == nil) || arg.MainSortField == "" {
 		return nil
 	}
-	comparisonOp := ">"
+	comparisonOp := OPGreater
 	var iterator int = 0
 	if param.After != nil && CursorToInt(*param.After) > 0 {
-		comparisonOp = ">"
+		comparisonOp = OPGreater
 		iterator = CursorToInt(*param.After)
 	} else if param.Before != nil && CursorToInt(*param.Before) > 0 {
-		comparisonOp = "<"
+		comparisonOp = OPLess
 		iterator = CursorToInt(*param.Before)
 	}
 
+	if arg.MainSortDirection == DirectionDesc {
+		if comparisonOp == OPGreater {
+			comparisonOp = OPLess
+		} else {
+			comparisonOp = OPGreater
+		}
+	}
+
 	fvp := &ConditionPair{
-		Field: cursorField,
-		Value: iterator,
+		Field: arg.MainSortField,
 		Op:    comparisonOp,
+		Value: iterator,
 	}
 	return fvp
 }
@@ -45,13 +54,6 @@ type CursorParams struct {
 	Before *string `json:"before" query:"before"`
 	First  *int    `json:"first" query:"first"`
 	Last   *int    `json:"last" query:"last"`
-	Used   bool    `json:"-" query:"-"`
-}
-
-const cursorField = "created_at"
-
-func IntToCursor(cursor int) string {
-	return base64Encode(fmt.Sprintf("cursor:%d", cursor))
 }
 
 func CursorToInt(cursor string) int {
@@ -70,6 +72,20 @@ func CursorToInt(cursor string) int {
 	return c
 }
 
-func StrToCursor(cursor string) string {
-	return base64Encode(fmt.Sprintf("cursor:%s", cursor))
+func StrToCursor(cursor interface{}) string {
+	v := reflect.ValueOf(cursor)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	switch v.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int32, reflect.Int64:
+		return base64Encode(fmt.Sprintf("c:%d", v.Int()))
+	case reflect.Uint, reflect.Uint8, reflect.Uint32, reflect.Uint64:
+		return base64Encode(fmt.Sprintf("c:%d", v.Uint()))
+	case reflect.String:
+		return base64Encode(fmt.Sprintf("c:%s", v.String()))
+	case reflect.Float32, reflect.Float64:
+		return base64Encode(fmt.Sprintf("c:%b", v.Float()))
+	}
+	return base64Encode(fmt.Sprintf("c:%+v", cursor))
 }

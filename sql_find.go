@@ -3,7 +3,9 @@ package ssql
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 )
 
@@ -13,7 +15,32 @@ func (c Client) FindOne(ctx context.Context, table string, idKey, idValue string
 	return rows, err
 }
 
-func (c Client) Find(ctx context.Context, options *SQLQueryOptions) (*sql.Rows, *int, error) {
+type FindResult struct {
+	Rows        *sql.Rows
+	TotalCount  *int
+	optionsUsed *SQLQueryOptions
+}
+
+func (c Client) Find(ctx context.Context, options *SQLQueryOptions) (*FindResult, error) {
+	if options == nil {
+		options = &SQLQueryOptions{}
+	}
+	if options.Tag == "" {
+		options.Tag = c.tag
+	}
+	if (options.MainSortDirection == "" && c.mainSortDirection == "") || (options.MainSortField == "" && c.mainSortField == "") {
+		return nil, errors.New("'Find' method requires you to set the 'MainSortDirection' & 'MainSortField' in client config or query options")
+	}
+	if options.MainSortDirection == "" {
+		options.MainSortDirection = c.mainSortDirection
+	}
+	if options.MainSortField == "" {
+		options.MainSortField = c.mainSortField
+	}
+	options.MainSortDirection = strings.ToUpper(options.MainSortDirection)
+	if options.MainSortDirection != DirectionAsc && options.MainSortDirection != DirectionDesc {
+		return nil, errors.New("Sort direction can only be ASC or DESC")
+	}
 	// Calculate totalCount.
 	var totalCount int
 	if options.WithTotalCount {
@@ -24,11 +51,10 @@ func (c Client) Find(ctx context.Context, options *SQLQueryOptions) (*sql.Rows, 
 		if whereStmPure != "" {
 			qTotalCount = fmt.Sprintf("%s WHERE %s", qTotalCount, whereStmPure)
 		}
-		c.l.debugf("count statement %s with args %+v", qTotalCount, argsPure)
 		err := c.db.QueryRow(qTotalCount, argsPure...).Scan(&totalCount)
 		if err != nil {
 			c.l.error(err, "Error preparing postgres count")
-			return nil, &totalCount, err
+			return nil, err
 		}
 	}
 
@@ -36,11 +62,12 @@ func (c Client) Find(ctx context.Context, options *SQLQueryOptions) (*sql.Rows, 
 	cursorConditions := []*ConditionPair{}
 	order := ""
 	pagination := ""
-	if options.Params != nil {
-		mutateParamsByCursor(options.Params)
-		order, pagination = getSQLStmFromPaginationAndSortParams(options.Params)
-		cursorConditions = sqlParamsToConditionPairs(options.Params)
+	if options.Params == nil {
+		options.Params = &Params{}
 	}
+	mutateParamsByCursor(options)
+	order, pagination = getSQLStmFromPaginationAndSortParams(options)
+	cursorConditions = sqlParamsToConditionPairs(options)
 	whereStm, args := getSQLWhereClauseFromConditions(append(options.Conditions, cursorConditions...), 0)
 
 	// Build query statement.
@@ -66,5 +93,44 @@ func (c Client) Find(ctx context.Context, options *SQLQueryOptions) (*sql.Rows, 
 
 	// Run the query.
 	rows, err := c.db.Query(q, args...)
-	return rows, &totalCount, err
+	return &FindResult{
+		Rows:        rows,
+		TotalCount:  &totalCount,
+		optionsUsed: options,
+	}, err
+}
+
+func SuperScan[T any](result *[]T, f *FindResult) (*PageInfo, error) {
+	for f.Rows.Next() {
+		var user T
+		if err := ScanRow(&user, f.Rows); err != nil {
+			return nil, err
+		}
+		*result = append(*result, user)
+	}
+	// Build the pageInfo connection.
+	_, pageInfo := PrepareGraphQLConnection(result, f.optionsUsed)
+	// Set StartCursor and EndCursor.
+	if f.optionsUsed != nil && f.optionsUsed.MainSortField != "" && result != nil && len(*result) > 0 {
+		userMappingsByTags, _ := ExtractStructMappings([]string{f.optionsUsed.Tag}, (*result)[0])
+		cursorStructFieldName := userMappingsByTags[f.optionsUsed.Tag][f.optionsUsed.MainSortField]
+		if pageInfo.HasPreviousPage != nil && *pageInfo.HasPreviousPage {
+			field := reflect.Indirect(reflect.ValueOf((*result)[0])).FieldByName(cursorStructFieldName)
+			if field.IsValid() && !field.IsNil() {
+				startCursor := StrToCursor(field.Interface())
+				pageInfo.StartCursor = &startCursor
+			}
+		}
+		if pageInfo.HasNextPage != nil && *pageInfo.HasNextPage {
+			field := reflect.Indirect(reflect.ValueOf((*result)[len(*result)-1])).FieldByName(cursorStructFieldName)
+			if field.IsValid() && !field.IsNil() {
+				endCursor := StrToCursor(field.Interface())
+				pageInfo.EndCursor = &endCursor
+			}
+		}
+	}
+	if f.TotalCount != nil {
+		pageInfo.TotalCount = f.TotalCount
+	}
+	return pageInfo, nil
 }

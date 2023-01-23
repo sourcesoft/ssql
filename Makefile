@@ -79,3 +79,8 @@ example-find:
 	@cd _examples/find && \
 	SSQL_DB=ssql SSQL_USERNAME=postgres SSQL_PASSWORD=dev SSQL_HOST=localhost SSQL_PORT=5432 \
     go run *.go
+	
+example-cursor:
+	@cd _examples/cursor && \
+	SSQL_DB=ssql SSQL_USERNAME=postgres SSQL_PASSWORD=dev SSQL_HOST=localhost SSQL_PORT=5432 \
+    go run *.go

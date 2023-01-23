@@ -1,12 +1,11 @@
 [![Godoc](http://img.shields.io/badge/godoc-reference-blue.svg?style=flat)](https://godoc.org/github.com/sourcesoft/ssql) [![license](http://img.shields.io/badge/license-MIT-red.svg?style=flat)](https://raw.githubusercontent.com/sourcesoft/ssql/main/LICENSE)
 
-**This library is still in development and the API may change**
+**This library is still in development and the API may change, see the [roadmap](#roadmap) for more information.**
 
 ### Table of Contents
 
 - [What it is and what it's not](#what-it-is-and-what-its-not)
-  * [Goal](#goal)
-  * [Features](#features)
+  * [Goal & Features](#goal--features)
   * [Limitations](#limitations)
 - [Getting Started](#getting-started)
 - [APIs](#apis)
@@ -17,7 +16,8 @@
   * [Delete](#delete)
   * [FindOne](#findone)
   * [Find](#find)
-    + [Find: Minimal](#find-minimal)
+    + [Find: Simple](#find-simple)
+    + [Find: SuperScan 💪](#find-superscan)
     + [Find: Offset Pagination](#find-offset-pagination)
     + [Find: Cursor Pagination](#find-cursor-pagination)
     + [Find: Sorting](#find-sorting)
@@ -26,6 +26,7 @@
   * [Raw](#raw)
   * [Helpers working with structs](#helpers-working-with-structs)
   * [Helpers scanning query results](#helpers-scanning-query-results)
+- [Roadmap](#roadmap)
 
 ## What it is and what it's not
 
@@ -39,22 +40,15 @@ If you need anything more than what the API provides, you can use the `Raw` meth
 
 [Examples](https://github.com/sourcesoft/ssql/tree/main/_examples)
 
-### Goal
+### Goal & Features
 
 - No unnecessary extra abstraction, should be compatible with standard `database/sql`
 - Opt-in for features that make common complex query patterns simple
 - Be opinionated and enforce some usage patterns best practices
 - Minimum use of `reflect`
-- Some common utilities for everyday usage like `sqlx` scan
-while still being compatible with standard `sql` lib
-
-### Features
-
-- Super simple, only a few query patterns are supported
-- Extra utils to scan rows
-- GraphQL cursor pagination
-- Utils for that are Relay spec compatible with Relay connections (first, last, before, after, totalCount, cursor, ...)
-- Limit and offset pagination
+- Some common utilities for everyday usage like `sqlx` scan while still being compatible with standard `sql` lib
+- GraphQL (+Relay Connection) cursor pagination
+- Limit and offset pagination built in and enforced
 
 ### Limitations
 
@@ -109,6 +103,8 @@ func main() {
   options := ssql.Options{
     Tag:      "sql", // Struct tag used for SQL field name (defaults to 'sql').
     LogLevel: ssql.LevelDebug, // By default loggin is disabled.
+    MainSortField:     "created_at",
+    MainSortDirection: ssql.DirectionDesc,
   }
   client, err := ssql.NewClient(ctx, dbCon, &options)
   if err != nil {
@@ -116,6 +112,11 @@ func main() {
   }
   ...
 ```
+
+Note that we have passed `MainSortField` and `MainSortDirection` options which is the default
+field and sorting direction used for pagination. SSQL library enforces these fields to be specified in either
+in the client Options or you can pass them as part of the query options to `Find` method to override the default.
+Only `Find` method requires these two options, without them it will return early with an error.
 
 See queries like [FindOne](#findone) or other APIs to see how to use the client to execute queries.
 
@@ -267,7 +268,7 @@ Check the [examples](https://github.com/sourcesoft/ssql/tree/main/_examples) fol
 
 ### Find
 
-#### Find: Minimal
+#### Find: Simple
 
 Let's see how a minimal simple `Find` query looks like.
 
@@ -288,14 +289,28 @@ opts := ssql.SQLQueryOptions{
   Table:          "user",
   WithTotalCount: shouldReturnTotalCount,
   Params:         &params,
+  MainSortField:     "created_at", // Used for cursor/offset pagination
+  MainSortDirection: ssql.DirectionDesc,
 }
 ```
+
+**Note SSQL library enforces `MainSortField` and `MainSortDirection` fields to be specified in either
+the client Options (as default) or you can pass them as part of the query options to `Find` method here to override the default.
+Only `Find` method requires these two options, without them it will return early with an error.**
+
+If you are unsure what field to use for `MainSortField`, you can choose the auto-increment ID or (if the PK is sth like GUID) you can
+choose a field that has epoch timestamp on it, eg: `created_at` or `updated_at`.
+
+Current `MainSortField` only supports integer values, support for timestamp SQL types will be added soon.
+
+For the rest of the documentation we will not mention these two options, assuming you have specified them at the top level
+in client options which is used as a fallback default config.
 
 Run the query by using the `Find` method.
 
 ```golang
 // Executing the query.
-rows, total, err := client.Find(ctx, &opts)
+result, err := client.Find(ctx, &opts)
 if err != nil {
   log.Error().Err(err).Msg("Cannot find users")
   panic(err)
@@ -307,12 +322,72 @@ Scan the rows into your arrays of custom structs.
 ```golang
 // Reading through the results.
 var users []User
-for rows.Next() {
+for result.Rows.Next() {
   var user User
-  if err := ssql.ScanRow(&user, rows); err != nil {
+  if err := ssql.ScanRow(&user, result.Rows); err != nil {
     log.Error().Err(err).Msg("Cannot scan users")
   }
   users = append(users, user)
+}
+```
+
+[↩](#table-of-contents)
+
+#### Find: SuperScan
+
+`ssql` also provides a powerful `SuperScan` function that takes care of Relay Connection and cursor
+pagination complexity. It also does the Scan itself for us and then spits out a `PageInfo` object:
+
+```golang
+type PageInfo struct {
+  HasPreviousPage *bool   `json:"hasPreviousPage,omitempty"`
+  HasNextPage     *bool   `json:"hasNextPage,omitempty"`
+  StartCursor     *string `json:"startCursor,omitempty"`
+  EndCursor       *string `json:"endCursor,omitempty"`
+  TotalCount      *int    `json:"-"`
+}
+```
+
+As you see, it's very similar to Relay connection type, in fact you can just use it as is in your
+GraphQL response.
+
+Most of the code is same up to running the `Find` method.
+
+```golang
+// setting up pagination.
+limit := 10
+params := ssql.Params{
+	CursorParams: &ssql.CursorParams{
+		First: &limit, // Get first 10 rows only.
+	},
+}
+opts := ssql.SQLQueryOptions{
+  Table:          "user",
+  WithTotalCount: shouldReturnTotalCount,
+  Params:         &params,
+}
+// Executing the query.
+result, err := client.Find(ctx, &opts)
+if err != nil {
+  log.Error().Err(err).Msg("Cannot find users")
+  panic(err)
+}
+```
+
+Note that we used `CursorParams` setting `First` option instead of offset. It's
+recommended to use `CursorParams` instead of `OffsetParams` as options, this allows
+the return `PageInfo` of `SuperScan` to return a more correct and complete result.
+
+
+Use the returned `result` and create a variable to store your list in. Pass
+both to `SuperScan` method and that's it.
+
+```golang
+var users []User
+pageInfo, err := ssql.SuperScan(&users, result)
+if err != nil {
+  log.Error().Err(err).Msg("SuperScan failed")
+  panic(err)
 }
 ```
 
@@ -336,21 +411,31 @@ opts := ssql.SQLQueryOptions{
   Table:          "user",
   Params:         &params,
 }
-rows, total, err := client.Find(ctx, &opts)
+result, err := client.Find(ctx, &opts)
 ```
 
 [↩](#table-of-contents)
 
 #### Find: Cursor Pagination
 
+If you use `SuperScan` in your queries, you can then use the `PageInfo` object that has
+the `StartCursor` and `EndCursor`.
+
 ```golang
+// From previous query
+var users []User
+pageInfo, err := ssql.SuperScan(&users, result)
+if err != nil {
+  log.Error().Err(err).Msg("SuperScan failed")
+  panic(err)
+}
+// Now that we have pageInfo object, we can use the next cursor.
 params := ssql.Params{
-	CursorParams: &ssql.CursorParams{
-    After:  previousCursor, // If you have the previous cursor, you can pass it here to continue the pagination.
-    Before: beforeCursor, // To go back in pagination.
-    First:  10, // Get first 20 results (works like LIMIT).
+  CursorParams: &ssql.CursorParams{
+    After:  pageInfo.EndCursor, // If you have the previous cursor, you can pass it here to continue the pagination.
+    First:  10, // Get first 10 results (works like LIMIT).
     Last:   nil, // Work same as first (LIMIT) but reverses the order of querying.
-  }
+  },
 }
 // Same as before use the params in query options argument.
 opts := ssql.SQLQueryOptions{
@@ -360,7 +445,7 @@ opts := ssql.SQLQueryOptions{
   Params:         &params,
   Conditions:     conds,
 }
-rows, total, err := client.Find(ctx, &opts)
+result, err := client.Find(ctx, &opts)
 ```
 
 [↩](#table-of-contents)
@@ -373,7 +458,7 @@ You can have one or many sorting configs. The order matters.
 params := ssql.Params{
   SortParams = []*ssql.SortParams{{
     Direction: "asc",
-    Field:     "created_at",
+    Field:     "hits",
   }}
 }
 // Same as before use the params in query options argument.
@@ -384,7 +469,7 @@ opts := ssql.SQLQueryOptions{
   Params:         &params,
   Conditions:     conds,
 }
-rows, total, err := client.Find(ctx, &opts)
+result, err := client.Find(ctx, &opts)
   
 ```
 
@@ -404,11 +489,11 @@ conds := []*ssql.ConditionPair{
     Value: true,
     Op:    "=", // equal operator
   },
-	{
-		Field: "user_id",
-		Value: userIDs,
-		Op:    "in", // Example of "IN" operator.
-	},
+  {
+    Field: "user_id",
+    Value: userIDs,
+    Op:    ssql.OPLogicalIn, // Example of "IN" operator.
+  },
 }
 // Same as before use the params in query options argument.
 opts := ssql.SQLQueryOptions{
@@ -418,7 +503,7 @@ opts := ssql.SQLQueryOptions{
   Params:         &params,
   Conditions:     conds,
 }
-rows, total, err := client.Find(ctx, &opts)
+result, err := client.Find(ctx, &opts)
 
 ```
 
@@ -426,49 +511,31 @@ rows, total, err := client.Find(ctx, &opts)
 
 #### Find: GraphQL
 
-You can get a full PageInfo GraphQL Relay type which is:
+As mentioned in `SuperScan` section, you can use it to return a `pageInfo` object for GraphQL Relay Connections:
 
 ```golang
 type PageInfo struct {
-	HasPreviousPage *bool   `json:"hasPreviousPage,omitempty"`
-	HasNextPage     *bool   `json:"hasNextPage,omitempty"`
-	StartCursor     *string `json:"startCursor,omitempty"`
-	EndCursor       *string `json:"endCursor,omitempty"`
-	TotalCount      *int    `json:"-"`
+  HasPreviousPage *bool   `json:"hasPreviousPage,omitempty"`
+  HasNextPage     *bool   `json:"hasNextPage,omitempty"`
+  StartCursor     *string `json:"startCursor,omitempty"`
+  EndCursor       *string `json:"endCursor,omitempty"`
+  TotalCount      *int    `json:"-"`
 }
 ```
-
-Simply use the helper function `PrepareGraphQLConnection` that returns `PageInfo` type above. Here's
-a example of how to use the helper function on the result of a query.
+Using the result, call the `SuperScan` to get you the `PageInfo` object.
 
 ```golang
 // First let's get a list of rows.
-rows, total, err := rp.Client.Find(ctx, &opts)
+result, err := rp.Client.Find(ctx, &opts)
 if err != nil {
   log.Logger(ctx).Error().Err(err).Msg("Cannot find users")
   panic(err)
 }
-var users []model.User
-for rows.Next() {
-	var user model.User
-	if err := ssql.ScanRow(&user, rows); err != nil {
-		log.Logger(ctx).Error().Err(err).Msg("Cannot scan users")
-	}
-	users = append(users, user)
-}
-// Build the pageInfo connection.
-result, pageInfo := ssql.PrepareGraphQLConnection(users, query.Params)
-// Set StartCursor and EndCursor.
-if pageInfo.HasPreviousPage != nil && *pageInfo.HasPreviousPage && result != nil && len(*result) > 0 {
-  startCursor := ssql.StrToCursor((*result)[0].GetPaginationCursor())
-  pageInfo.StartCursor = &startCursor
-}
-if pageInfo.HasNextPage != nil && *pageInfo.HasNextPage && result != nil && len(*result) > 0 {
-  startCursor := ssql.StrToCursor((*result)[len(*result)-1].GetPaginationCursor())
-  pageInfo.EndCursor = &startCursor
-}
-if total != nil {
-  pageInfo.TotalCount = total
+var users []User
+pageInfo, err := ssql.SuperScan(&users, result)
+if err != nil {
+  log.Error().Err(err).Msg("SuperScan failed")
+  panic(err)
 }
 ```
 
@@ -563,6 +630,9 @@ instead of for each find since it uses `reflect` internally.
 To do this call `ExtractStructMappings` outside of your insert function/method in the same file for your type, then use it to
 populate the fields array.
 
+**Note that even though we recommend calling this helper function outside of frequently called functions/methods,
+but `ExtractStructMappings` still internally caches the result of heavy reflects operations so technically each type in your
+code base will only use reflect once.**
 
 ```golang
 
@@ -584,7 +654,7 @@ func MyInsertRowFunction(user *User) {
     ...
   }
   // Executing the query.
-  rows, total, err := client.Find(ctx, &opts)
+  result, err := client.Find(ctx, &opts)
   if err != nil {
     log.Error().Err(err).Msg("Cannot find users")
     panic(err)
@@ -597,7 +667,7 @@ func MyInsertRowFunction(user *User) {
 ### Helpers scanning query results
 
 Use `ScanOne` if you are selecting/expecting one result. You can pass your struct pointer as is to scan it
-without mapping individual fields like the standard `database/sql` library forces you to.
+without mapping individual fields like the standard `database/sql` library forces you to. 
 
 ```golang
 rows, err := client.FindOne(ctx, "user", "id", "7f8d1637-ca82-4b1b-91dc-0828c98ebb34")
@@ -615,20 +685,32 @@ if err := ssql.ScanOne(&resp, rows); err != nil {
 Use `ScanRow` inside the `rows.Next()` loop to populate your users array.
 
 ```golang
-rows, total, err := client.Find(ctx, &opts)
+result, err := client.Find(ctx, &opts)
 if err != nil {
   log.Error().Err(err).Msg("Cannot find users")
   panic(err)
 }
 // Reading through the results.
 var users []User
-for rows.Next() {
+for result.Rows.Next() {
   var user User
-  if err := ssql.ScanRow(&user, rows); err != nil {
+  if err := ssql.ScanRow(&user, result.Rows); err != nil {
     log.Error().Err(err).Msg("Cannot scan users")
   }
   users = append(users, user)
 }
 ```
+
+[↩](#table-of-contents)
+
+## Roadmap
+
+- [ ] Add support for OR operator.
+- [ ] Add tests.
+- [ ] Add support for LIKE and NOT logical operators.
+- [ ] Add support for timestamp types to be used as cursor fields (not just epoch).
+- [ ] Add full example of GraphQL usage.
+- [ ] Add mock package.
+- [ ] Add benchmarks.
 
 [↩](#table-of-contents)

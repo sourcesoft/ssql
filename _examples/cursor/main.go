@@ -45,59 +45,65 @@ func main() {
 		panic(err)
 	}
 
-	// Preparing the query options.
-	// Fields to fetch, set to null to fetch all fields (uses '*').
-	dbFields := map[string]bool{
-		"id":         true,
-		"email":      true,
-		"username":   true,
-		"active":     true,
-		"created_at": true,
-	}
-	// Add some custom conditions.
-	conds := []*ssql.ConditionPair{{
-		Field: "active",
-		Value: true,
-		Op:    "=",
-	}}
-	// setting up pagination.
-	shouldReturnTotalCount := true
-	limit := 10
+	// Let's run our first query.
+	limit := 1 // Only getting one record so we have room for the next pagination.
 	params := ssql.Params{
-		OffsetParams: &ssql.OffsetParams{
-			Limit: &limit,
-			// There's also offset available.
+		// OffsetParams: &ssql.OffsetParams{
+		// 	Limit: &limit,
+		// },
+		CursorParams: &ssql.CursorParams{
+			First: &limit,
 		},
-		// There's also 'order' available.
-		// There's also 'cursor' pagination available.
 	}
 	opts := ssql.SQLQueryOptions{
 		Table:             "user",
-		Fields:            dbFields,
-		WithTotalCount:    shouldReturnTotalCount,
 		Params:            &params,
-		Conditions:        conds,
 		MainSortField:     "created_at",
 		MainSortDirection: ssql.DirectionDesc,
 	}
-
-	// Executing the query.
 	result, err := client.Find(ctx, &opts)
 	if err != nil {
 		log.Error().Err(err).Msg("Cannot find users")
 		panic(err)
 	}
-
-	// Reading through the results.
 	var users []User
-	for result.Rows.Next() {
-		var user User
-		if err := ssql.ScanRow(&user, result.Rows); err != nil {
-			log.Error().Err(err).Msg("Cannot scan users")
-		}
-		users = append(users, user)
+	pageInfo, err := ssql.SuperScan(&users, result)
+	if err != nil {
+		log.Error().Err(err).Msg("SuperScan failed")
+		panic(err)
 	}
-	log.Debug().Interface("users", users).Msgf("Found users successfully with total of %d", *result.TotalCount)
+	log.Debug().Interface("users", users).Msg("Found users successfully")
+	log.Debug().Interface("pageInfo", pageInfo).Msg("SuperScan pageInfo struct")
+
+	// Create cursor using created_at field
+	log.Debug().Str("endCursor", *pageInfo.EndCursor).Msg("Next cursor")
+
+	// Let's get the next rows
+	paramsNext := ssql.Params{
+		CursorParams: &ssql.CursorParams{
+			After: pageInfo.EndCursor, // If you have the previous cursor, you can pass it here to continue the pagination.
+			First: &limit,             // Get first 10 results (works like LIMIT).
+		},
+	}
+	optsNext := ssql.SQLQueryOptions{
+		Table:             "user",
+		Params:            &paramsNext,
+		MainSortField:     "created_at",
+		MainSortDirection: ssql.DirectionDesc,
+	}
+	result2, err := client.Find(ctx, &optsNext)
+	if err != nil {
+		log.Error().Err(err).Msg("Cannot find users again")
+		panic(err)
+	}
+	var usersNext []User
+	pageInfo2, err := ssql.SuperScan(&usersNext, result2)
+	if err != nil {
+		log.Error().Err(err).Msg("SuperScan failed")
+		panic(err)
+	}
+	log.Debug().Interface("usersNext", usersNext).Msg("Found users successfully")
+	log.Debug().Interface("pageInfo", pageInfo2).Msg("SuperScan pageInfo struct")
 }
 
 type User struct {
