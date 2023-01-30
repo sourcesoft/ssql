@@ -27,6 +27,7 @@
   * [Helpers working with structs](#helpers-working-with-structs)
   * [Helpers scanning query results](#helpers-scanning-query-results)
 - [Roadmap](#roadmap)
+- [Credits](#credits)
 
 ## What it is and what it's not
 
@@ -714,3 +715,9 @@ for result.Rows.Next() {
 - [ ] Add benchmarks.
 
 [↩](#table-of-contents)
+
+## Credits
+
+- Thanks to [scany](github.com/georgysavva/scany), `ScanRow` and `ScanOne` are
+actually just wrappers around scany library.
+- Thanks to [this comment](https://github.com/graphql/graphql-relay-js/issues/94#issuecomment-232410564).
