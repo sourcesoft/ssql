@@ -64,7 +64,7 @@ const (
 	// Used by query options and the API.
 	DirectionDesc    = "DESC"
 	DirectionAsc     = "ASC"
-	OPEqual          = ">"
+	OPEqual          = "="
 	OPNotEqual       = "<>"
 	OPGreater        = ">"
 	OPLess           = "<"

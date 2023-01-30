@@ -196,7 +196,7 @@ You can also create a condition array to update all the matching fields.
 conds := []*ssql.ConditionPair{{
   Field: "active",
   Value: true,
-  Op:    "=",
+  Op:    ssql.OPEqual, // '=' operator.
 }}
 fFalse = false
 newUser.Active = &fFalse
@@ -232,7 +232,7 @@ You can also create a condition array to delete all the matching fields.
 conds := []*ssql.ConditionPair{{
   Field: "active",
   Value: false,
-  Op:    "=",
+  Op:    ssql.OPEqual, // '=' operator.
 }}
 res, err = client.Delete(ctx, "user", conds)
 if err != nil {
@@ -488,7 +488,7 @@ conds := []*ssql.ConditionPair{
   {
     Field: "active",
     Value: true,
-    Op:    "=", // equal operator
+    Op:    ssql.OPEqual, // '=' operator.
   },
   {
     Field: "user_id",
