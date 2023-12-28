@@ -39,7 +39,7 @@ func popArray[T any](slice *[]T) *[]T {
 var mappingCache = map[interface{}][]TagMappings{}
 
 func getMappingCacheKey(t *reflect.Type, tags *[]string) string {
-	return (*t).PkgPath() + ":" + strings.Join(*tags, ",")
+	return (*t).PkgPath() + ":" + (*t).Name() + ":" + strings.Join(*tags, ",")
 }
 
 func ExtractStructMappings(tags []string, s interface{}) (TagMappings, TagMappings) {
